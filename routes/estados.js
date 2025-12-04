@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
     }
 
     // Agregar paginación
-    queryText += ` ORDER BY nombre LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    queryText += ` ORDER BY id ASC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     queryParams.push(limit, offset);
 
     const result = await query(queryText, queryParams);

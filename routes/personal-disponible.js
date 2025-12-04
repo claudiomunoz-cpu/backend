@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../config/database');
+const carpetasPersonal = require('./carpetas-personal');
 
 // GET /personal-disponible - listar todo el personal disponible (con paginación opcional)
 router.get('/', async (req, res) => {
@@ -176,12 +177,30 @@ router.post('/', async (req, res) => {
       sexo,
       fecha_nacimiento,
       licencia_conducir,
-      talla_zapatos,
       talla_pantalones,
       talla_poleras,
       cargo,
       estado_id,
-      zona_geografica
+      zona_geografica,
+      nombres,
+      comentario_estado,
+      documentacion_id,
+      estado_civil,
+      pais,
+      region,
+      comuna,
+      ciudad,
+      telefono,
+      correo_electronico,
+      correo_personal,
+      contacto_emergencia,
+      talla_ropa,
+      talla_pantalon,
+      talla_zapato,
+      id_centro_costo,
+      centro_costo,
+      sede,
+      created_at
     } = req.body;
 
     // Validaciones
@@ -213,11 +232,14 @@ router.post('/', async (req, res) => {
 
     const queryText = `
       INSERT INTO mantenimiento.personal_disponible (
-        rut, sexo, fecha_nacimiento, licencia_conducir, 
-        talla_zapatos, talla_pantalones, talla_poleras, 
-        cargo, estado_id, zona_geografica
+        rut, sexo, fecha_nacimiento, licencia_conducir,
+        talla_zapatos, talla_pantalones, talla_poleras, talla_ropa, talla_pantalon, talla_zapato,
+        cargo, estado_id, zona_geografica, nombres, comentario_estado,
+        documentacion_id, estado_civil, pais, region, comuna, ciudad,
+        telefono, correo_electronico, correo_personal, contacto_emergencia,
+        id_centro_costo, centro_costo, sede, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
       RETURNING *
     `;
 
@@ -229,10 +251,47 @@ router.post('/', async (req, res) => {
       talla_zapatos || '',
       talla_pantalones || '',
       talla_poleras || '',
+      talla_ropa || null,
+      talla_pantalon || null,
+      talla_zapato || null,
       cargo,
       estado_id,
-      zona_geografica || null
-    ]);
+      zona_geografica || null,
+      nombres || null,
+      comentario_estado || null,
+      documentacion_id || null,
+      estado_civil || null,
+      pais || null,
+      region || null,
+      comuna || null,
+      ciudad || null,
+      telefono || null,
+      correo_electronico || null,
+      correo_personal || null,
+      contacto_emergencia || null,
+      id_centro_costo || null,
+      centro_costo || null,
+      sede || null,
+      created_at || null
+    ].slice(0,28));
+
+    // Intentar crear/verificar carpeta en unidad compartida
+    (async () => {
+      try {
+        const nombresVal = (nombres || result.rows[0].nombres || '').toString();
+        const rutVal = (rut || result.rows[0].rut || '').toString();
+        if (carpetasPersonal && typeof carpetasPersonal.crearCarpetaPersonal === 'function') {
+          const carpetaRes = await carpetasPersonal.crearCarpetaPersonal(rutVal, nombresVal);
+          if (carpetaRes && carpetaRes.success) {
+            console.log(`✅ Carpeta creada/verificada para ${nombresVal} (${rutVal}): ${carpetaRes.path}`);
+          } else {
+            console.warn(`⚠️ No se pudo crear/verificar carpeta para ${nombresVal} (${rutVal}):`, carpetaRes && carpetaRes.error ? carpetaRes.error : carpetaRes);
+          }
+        }
+      } catch (err) {
+        console.error('Error creando carpeta para personal tras inserción:', err);
+      }
+    })();
 
     res.status(201).json({
       success: true,
@@ -254,17 +313,34 @@ router.post('/', async (req, res) => {
 router.put('/:rut', async (req, res) => {
   try {
     const { rut } = req.params;
+    // Support both flat body and a wrapper { personalData: { ... } }
+    const payload = req.body && req.body.personalData ? req.body.personalData : req.body || {};
+
+    // Normalize common frontend keys to backend column names
+    const correo_electronico = payload.correo_electronico || payload.email || payload.mail || null;
+    const telefono = payload.telefono || payload.phone || payload.telefono_movil || null;
+    const contacto_emergencia = payload.contacto_emergencia || payload.contactoEmergencia || payload.emergencyContact || null;
+
     const {
       sexo,
       fecha_nacimiento,
       licencia_conducir,
-      talla_zapatos,
-      talla_pantalones,
-      talla_poleras,
       cargo,
       estado_id,
-      zona_geografica
-    } = req.body;
+      nombres,
+      documentacion_id,
+      estado_civil,
+      pais,
+      region,
+      comuna,
+      ciudad,
+      talla_ropa,
+      talla_pantalon,
+      talla_zapato,
+      id_centro_costo,
+      centro_costo,
+      sede
+    } = payload;
 
     // Validaciones
     if (!sexo || !fecha_nacimiento || !licencia_conducir || !cargo || !estado_id) {
@@ -281,13 +357,25 @@ router.put('/:rut', async (req, res) => {
         sexo = $1, 
         fecha_nacimiento = $2, 
         licencia_conducir = $3,
-        talla_zapatos = $4, 
-        talla_pantalones = $5, 
-        talla_poleras = $6,
-        cargo = $7, 
-        estado_id = $8, 
-        zona_geografica = $9
-      WHERE rut = $10
+        cargo = $4, 
+        estado_id = $5,
+        nombres = $6,
+        documentacion_id = $7,
+        estado_civil = $8,
+        pais = $9,
+        region = $10,
+        comuna = $11,
+        ciudad = $12,
+        telefono = $13,
+        correo_electronico = $14,
+        contacto_emergencia = $15,
+        talla_ropa = $16,
+        talla_pantalon = $17,
+        talla_zapato = $18,
+        id_centro_costo = $19,
+        centro_costo = $20,
+        sede = $21
+      WHERE rut = $22
       RETURNING *
     `;
 
@@ -295,12 +383,24 @@ router.put('/:rut', async (req, res) => {
       sexo,
       fecha_nacimiento,
       licencia_conducir,
-      talla_zapatos || '',
-      talla_pantalones || '',
-      talla_poleras || '',
       cargo,
       estado_id,
-      zona_geografica || null,
+      nombres || null,
+      documentacion_id || null,
+      estado_civil || null,
+      pais || null,
+      region || null,
+      comuna || null,
+      ciudad || null,
+      telefono || null,
+      correo_electronico || null,
+      contacto_emergencia || null,
+      talla_ropa || null,
+      talla_pantalon || null,
+      talla_zapato || null,
+      id_centro_costo || null,
+      centro_costo || null,
+      sede || null,
       rut
     ]);
 
@@ -312,11 +412,29 @@ router.put('/:rut', async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      message: 'Personal disponible actualizado exitosamente',
-      data: result.rows[0]
-    });
+      // Intentar crear/verificar carpeta en unidad compartida (no bloquear respuesta)
+      (async () => {
+        try {
+          const nombresVal = (nombres || result.rows[0].nombres || '').toString();
+          const rutVal = rut;
+          if (carpetasPersonal && typeof carpetasPersonal.crearCarpetaPersonal === 'function') {
+            const carpetaRes = await carpetasPersonal.crearCarpetaPersonal(rutVal, nombresVal);
+            if (carpetaRes && carpetaRes.success) {
+              console.log(`✅ Carpeta creada/verificada para ${nombresVal} (${rutVal}): ${carpetaRes.path}`);
+            } else {
+              console.warn(`⚠️ No se pudo crear/verificar carpeta para ${nombresVal} (${rutVal}):`, carpetaRes && carpetaRes.error ? carpetaRes.error : carpetaRes);
+            }
+          }
+        } catch (err) {
+          console.error('Error creando carpeta para personal tras actualización:', err);
+        }
+      })();
+
+      res.json({
+        success: true,
+        message: 'Personal disponible actualizado exitosamente',
+        data: result.rows[0]
+      });
 
   } catch (error) {
     console.error('Error al actualizar personal disponible:', error);
@@ -324,6 +442,61 @@ router.put('/:rut', async (req, res) => {
       success: false,
       error: 'Error al actualizar personal disponible',
       message: error.message
+    });
+  }
+});
+
+// GET /personal-disponible/por-cliente/:cliente_id - Obtener personal que cumple con prerrequisitos de un cliente
+router.get('/por-cliente/:cliente_id', async (req, res) => {
+  const { cliente_id } = req.params;
+
+  try {
+    const queryText = `
+      SELECT 
+        pd.*,
+        e.nombre as estado_nombre
+      FROM 
+        mantenimiento.personal_disponible pd
+      JOIN 
+        mantenimiento.estados e ON pd.estado_id = e.id
+      WHERE 
+        pd.estado_id = 1 -- Solo personal con estado 'Disponible'
+        AND NOT EXISTS (
+          -- Selecciona los prerrequisitos que el personal NO cumple
+          SELECT 1
+          FROM mantenimiento.cliente_prerrequisitos cp
+          WHERE 
+            (cp.cliente_id = $1 OR cp.cliente_id IS NULL) -- Prerrequisitos del cliente y globales
+            AND NOT EXISTS (
+              -- Verifica si existe un documento válido para el prerrequisito
+              SELECT 1
+              FROM mantenimiento.documentos d
+              WHERE 
+                d.rut_persona = pd.rut
+                AND d.tipo_documento = cp.tipo_documento
+                AND (
+                  cp.dias_duracion IS NULL OR -- El prerrequisito no expira
+                  (d.fecha_emision IS NOT NULL AND d.fecha_emision + (cp.dias_duracion || ' days')::interval >= CURRENT_DATE)
+                )
+            )
+        );
+    `;
+
+    const result = await query(queryText, [cliente_id]);
+
+    res.json({
+      success: true,
+      message: `Personal que cumple con los prerrequisitos del cliente ${cliente_id} obtenido exitosamente.`,
+      count: result.rows.length,
+      data: result.rows,
+    });
+
+  } catch (error) {
+    console.error(`Error al obtener personal por prerrequisitos del cliente ${cliente_id}:`, error);
+    res.status(500).json({
+      success: false,
+      error: `Error al obtener personal para el cliente ${cliente_id}`,
+      message: error.message,
     });
   }
 });
@@ -352,16 +525,13 @@ router.get('/verify-import', async (req, res) => {
     
     // Obtener últimos registros importados (asumiendo que tienen comentario_estado con 'Importado:')
     const recentImportsQuery = `
-      SELECT 
-        rut,
-        sexo,
-        fecha_nacimiento,
-        cargo,
-        zona_geografica,
-        comentario_estado
-      FROM mantenimiento.personal_disponible 
-      WHERE comentario_estado LIKE 'Importado:%'
-      ORDER BY rut
+      SELECT
+        pd.*,
+        e.nombre as estado_nombre
+      FROM mantenimiento.personal_disponible pd
+      LEFT JOIN mantenimiento.estados e ON pd.estado_id = e.id
+      WHERE pd.comentario_estado LIKE 'Importado:%'
+      ORDER BY pd.rut
       LIMIT 10
     `;
     
@@ -441,11 +611,11 @@ router.get('/verify-import', async (req, res) => {
 router.delete('/:rut', async (req, res) => {
   try {
     const { rut } = req.params;
+    console.log(`🗑️ Eliminando personal con RUT: ${rut}`);
 
-    const queryText = 'DELETE FROM mantenimiento.personal_disponible WHERE rut = $1 RETURNING *';
-    const result = await query(queryText, [rut]);
-
-    if (result.rows.length === 0) {
+    // Verificar que existe el personal
+    const checkExists = await query('SELECT rut, nombres FROM mantenimiento.personal_disponible WHERE rut = $1', [rut]);
+    if (checkExists.rows.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'Personal no encontrado',
@@ -453,11 +623,80 @@ router.delete('/:rut', async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      message: 'Personal disponible eliminado exitosamente',
-      data: result.rows[0]
-    });
+    const personalData = checkExists.rows[0];
+    console.log(`📋 Eliminando datos relacionados para: ${personalData.nombres} (${rut})`);
+
+    // Iniciar transacción para eliminar en cascada
+    await query('BEGIN');
+
+    try {
+      // 1. Eliminar de programación semanal (sin claves foráneas)
+      const programacionResult = await query('DELETE FROM mantenimiento.programacion_semanal WHERE rut = $1', [rut]);
+      console.log(`  ✅ Programación semanal: ${programacionResult.rowCount} registros eliminados`);
+
+      // 2. Eliminar de historial de programación (sin claves foráneas)
+      const historialResult = await query('DELETE FROM mantenimiento.programacion_historial WHERE rut = $1', [rut]);
+      console.log(`  ✅ Historial programación: ${historialResult.rowCount} registros eliminados`);
+
+      // 3. Eliminar asignaciones (sin claves foráneas)
+      const carterasResult = await query('DELETE FROM mantenimiento.personal_carteras WHERE rut = $1', [rut]);
+      console.log(`  ✅ Asignaciones carteras: ${carterasResult.rowCount} registros eliminados`);
+
+      const clientesResult = await query('DELETE FROM mantenimiento.personal_clientes WHERE rut = $1', [rut]);
+      console.log(`  ✅ Asignaciones clientes: ${clientesResult.rowCount} registros eliminados`);
+
+      const nodosResult = await query('DELETE FROM mantenimiento.personal_nodos WHERE rut = $1', [rut]);
+      console.log(`  ✅ Asignaciones nodos: ${nodosResult.rowCount} registros eliminados`);
+
+      // 4. Eliminar estados del personal (sin claves foráneas)
+      const estadosResult = await query('DELETE FROM mantenimiento.personal_estados WHERE rut = $1', [rut]);
+      console.log(`  ✅ Estados personal: ${estadosResult.rowCount} registros eliminados`);
+
+      // 5. Eliminar documentos (CON clave foránea hacia personal_disponible)
+      const documentosResult = await query('DELETE FROM mantenimiento.documentos WHERE rut_persona = $1', [rut]);
+      console.log(`  ✅ Documentos: ${documentosResult.rowCount} registros eliminados`);
+
+      // 6. Eliminar cursos (CON clave foránea hacia personal_disponible)
+      const cursosResult = await query('DELETE FROM mantenimiento.cursos WHERE rut_persona = $1', [rut]);
+      console.log(`  ✅ Cursos: ${cursosResult.rowCount} registros eliminados`);
+
+      // Verificar que no quedan cursos antes de eliminar personal
+      const cursosRestantes = await query('SELECT COUNT(*) as total FROM mantenimiento.cursos WHERE rut_persona = $1', [rut]);
+      console.log(`  🔍 Cursos restantes después de eliminación: ${cursosRestantes.rows[0].total}`);
+
+      // 7. Finalmente, eliminar el personal (después de eliminar todas las referencias)
+      const personalResult = await query('DELETE FROM mantenimiento.personal_disponible WHERE rut = $1 RETURNING *', [rut]);
+      console.log(`  ✅ Personal eliminado: ${personalResult.rowCount} registros`);
+
+      // Confirmar transacción
+      await query('COMMIT');
+
+      console.log(`🎉 Eliminación completa para RUT: ${rut}`);
+
+      res.json({
+        success: true,
+        message: 'Personal disponible y todos sus datos relacionados eliminados exitosamente',
+        data: {
+          personal: personalResult.rows[0],
+          eliminaciones: {
+            programacion_semanal: programacionResult.rowCount,
+            historial_programacion: historialResult.rowCount,
+            asignaciones_carteras: carterasResult.rowCount,
+            asignaciones_clientes: clientesResult.rowCount,
+            asignaciones_nodos: nodosResult.rowCount,
+            estados_personal: estadosResult.rowCount,
+            cursos: cursosResult.rowCount,
+            documentos: documentosResult.rowCount
+          }
+        }
+      });
+
+    } catch (cascadeError) {
+      // Revertir transacción en caso de error
+      await query('ROLLBACK');
+      console.error('❌ Error en eliminación en cascada:', cascadeError);
+      throw cascadeError;
+    }
 
   } catch (error) {
     console.error('Error al eliminar personal disponible:', error);
